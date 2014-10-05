@@ -19,9 +19,6 @@
         "components/jquery": "~1.8.0",
         "components/jqueryui": "1.11.1"
     },
-    "config": {
-        "component-dir": "web/assets"
-    },
     "extra": {
         "component": {
             "scripts": [
@@ -34,8 +31,7 @@
             "files": [
                 "img/*.png",
                 "img/*.gif",
-                "js/i18n/*.js",
-                "js/tinymce.js"
+                "js/i18n/*.js"
             ]
         }
     },
