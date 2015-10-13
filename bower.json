@@ -1,0 +1,27 @@
+{
+  "name": "elfinder",
+  "homepage": "https://github.com/helios-ag/elfinder-component",
+  "description": "elFinder frontend part",
+  "main": [
+     "dist/js/elfinder.min.js",
+     "dist/css/elfinder.min.css"
+     "dist/css/theme.css"
+  ],
+  "moduleType": "globals",
+  "keywords": [
+    "elfinder",
+    "filebrowser",
+    "filemanager"
+  ],
+  "license": "BSD-3-Clause",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "1.11.3 - 2",
+    "jqueryui": "1.11.4 - 2"
+}
