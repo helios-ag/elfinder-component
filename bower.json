@@ -24,4 +24,5 @@
   "dependencies": {
     "jquery": "1.11.3 - 2",
     "jqueryui": "1.11.4 - 2"
+  }
 }
