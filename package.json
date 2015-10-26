@@ -1,0 +1,25 @@
+{
+  "name": "elfinder",
+  "version": "2.1.0",
+  "description": "elFinder is an open-source file manager for web, written in JavaScript using jQuery UI.",
+  "main": "dist/js/elfinder.min.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helios-ag/elfinder-component.git"
+  },
+  "keywords": [
+    "filebrowser",
+    "filemanager",
+    "elfinder"
+  ],
+  "author": "Studio-42",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/helios-ag/elfinder-component/issues"
+  },
+  "homepage": "https://github.com/helios-ag/elfinder-component#readme",
+  "dependencies": {
+    "jquery": "1.11.3 - 2",
+    "jqueryui": "1.11.4 - 2"
+  }
+}
