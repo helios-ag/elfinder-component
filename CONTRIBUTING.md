@@ -8,8 +8,7 @@ improved documentation, a fixed bug or a whole new feature.
 
  1. Fork the repository on GitHub
  2. Pull requests must be sent from a new hotfix/feature branch, not from `master`.
- 3. Make your modifications, coding standard for the project is [PSR-2](https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-2-coding-style-guide.md)
- 4. Commit small logical changes, each with a descriptive commit message.
+ 3. Commit small logical changes, each with a descriptive commit message.
     Please don't mix unrelated changes in a single commit.
 
 ## Commit messages
