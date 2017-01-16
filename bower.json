@@ -4,7 +4,7 @@
   "description": "elFinder frontend part",
   "main": [
      "dist/js/elfinder.min.js",
-     "dist/css/elfinder.min.css"
+     "dist/css/elfinder.min.css",
      "dist/css/theme.css"
   ],
   "moduleType": "globals",
