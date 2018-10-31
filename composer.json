@@ -30,6 +30,7 @@
             ],
             "files": [
                 "dist/img/*.png",
+                "dist/img/*.svg",
                 "dist/img/*.gif",
                 "dist/js/i18n/*.js"
             ]
