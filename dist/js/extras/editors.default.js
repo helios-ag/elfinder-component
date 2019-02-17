@@ -48,22 +48,59 @@
 			}
 			return ext;
 		},
+		changeImageType = function(src, toMime) {
+			var dfd = $.Deferred();
+			try {
+				var canvas = document.createElement('canvas'),
+					ctx = canvas.getContext('2d'),
+					img = new Image(),
+					conv = function() {
+						var url = canvas.toDataURL(toMime),
+							mime, m;
+						if (m = url.match(/^data:([a-z0-9]+\/[a-z0-9.+-]+)/i)) {
+							mime = m[1];
+						} else {
+							mime = '';
+						}
+						if (mime.toLowerCase() === toMime.toLowerCase()) {
+							dfd.resolve(canvas.toDataURL(toMime), canvas);
+						} else {
+							dfd.reject();
+						}
+					};
+
+				img.src = src;
+				$(img).on('load', function() {
+					try {
+						canvas.width = img.width;
+						canvas.height = img.height;
+						ctx.drawImage(img, 0, 0);
+						conv();
+					} catch(e) {
+						dfd.reject();
+					}
+				}).on('error', function () {
+					dfd.reject();
+				});
+				return dfd;
+			} catch(e) {
+				return dfd.reject();
+			}
+		},
 		initImgTag = function(id, file, content, fm) {
 			var node = $(this).children('img:first').data('ext', getExtention(file.mime, fm)),
-				spnr = $('<div/>')
-					.css({
-						position: 'absolute',
-						top: '50%',
-						textAlign: 'center',
-						width: '100%',
-						fontSize: '16pt'
-					})
-					.html(fm.i18n('ntfloadimg'))
+				spnr = $('<div class="elfinder-edit-spinner elfinder-edit-image"/>')
+					.html('<span class="elfinder-spinner-text">' + fm.i18n('ntfloadimg') + '</span><span class="elfinder-spinner"/>')
 					.hide()
-					.appendTo(this);
+					.appendTo(this),
+				url;
 			
+			if (!content.match(/^data:/)) {
+				url = fm.openUrl(file.hash);
+				node.attr('_src', content);
+			}
 			node.attr('id', id+'-img')
-				.attr('src', content)
+				.attr('src', url || content)
 				.css({'height':'', 'max-width':'100%', 'max-height':'100%', 'cursor':'pointer'})
 				.data('loading', function(done) {
 					var btns = node.closest('.elfinder-dialog').find('button,.elfinder-titlebar-button');
@@ -191,7 +228,7 @@
 					src += '&exit='+encodeURIComponent(myurl+'&image=0');
 					src += '&target='+encodeURIComponent(myurl);
 					src += '&title='+encodeURIComponent(file.name);
-					src += '&image='+encodeURIComponent(node.attr('src'));
+					src += '&image='+encodeURIComponent(node.attr('_src'));
 					
 					opts.src = src;
 					opts.css = {
@@ -344,11 +381,17 @@
 					fm   = this.fm,
 					dfrd = $.Deferred(),
 					cdns = fm.options.cdns,
-					ver  = 'latest',
+					ver  = 'v3.4.0',
 					init = function(editor) {
 						var $base = $(base),
+							bParent = $base.parent(),
 							opts = self.confObj.opts,
 							iconsPath = opts.iconsPath,
+							tmpContainer = $('<div class="tui-image-editor-container">').appendTo(bParent),
+							tmpDiv = [
+								$('<div class="tui-image-editor-submenu"/>').appendTo(tmpContainer),
+								$('<div class="tui-image-editor-controls"/>').appendTo(tmpContainer)
+							],
 							iEditor = new editor(base, {
 								includeUI: {
 									loadImage: {
@@ -356,53 +399,47 @@
 										name: self.file.name
 									},
 									theme: Object.assign(opts.theme, {
-										// main icons
-										'menu.normalIcon.path': iconsPath + 'icon-b.svg',
-										'menu.normalIcon.name': 'icon-b',
-										'menu.activeIcon.path': iconsPath + 'icon-a.svg',
-										'menu.activeIcon.name': 'icon-a',
-										// submenu icons
-										'submenu.normalIcon.path': iconsPath + 'icon-a.svg',
-										'submenu.normalIcon.name': 'icon-a',
+										'menu.normalIcon.path': iconsPath + 'icon-d.svg',
+										'menu.normalIcon.name': 'icon-d',
+										'menu.activeIcon.path': iconsPath + 'icon-b.svg',
+										'menu.activeIcon.name': 'icon-b',
+										'menu.disabledIcon.path': iconsPath + 'icon-a.svg',
+										'menu.disabledIcon.name': 'icon-a',
+										'menu.hoverIcon.path': iconsPath + 'icon-c.svg',
+										'menu.hoverIcon.name': 'icon-c',
+										'submenu.normalIcon.path': iconsPath + 'icon-d.svg',
+										'submenu.normalIcon.name': 'icon-d',
 										'submenu.activeIcon.path': iconsPath + 'icon-c.svg',
-										'submenu.activeIcon.name': 'icon-c',
+										'submenu.activeIcon.name': 'icon-c'
 									}),
 									initMenu: 'filter',
 									menuBarPosition: 'bottom'
 								},
-								cssMaxWidth: 700,
-								cssMaxHeight: 500
+								cssMaxWidth: Math.max(300, bParent.width()),
+								cssMaxHeight: Math.max(200, bParent.height() - (tmpDiv[0].height() + tmpDiv[1].height() + 3 /*margin*/)),
+								usageStatistics: false
 							}),
 							canvas = $base.find('canvas:first').get(0),
 							zoom = function(v) {
-								var c = $(canvas),
-									w = parseInt(c.attr('width')),
-									h = parseInt(c.attr('height')),
-									a = w / h,
-									mw, mh, css;
-								if (v === 0) {
-									mw = w;
-									mh = h;
-								} else {
-									mw = parseInt(c.css('max-width')) + Number(v);
-									mh = mw / a;
-								}
-								css = {
-									maxWidth: mw,
-									maxHeight: mh
-								};
-								per.text(Math.round(mw / w * 100) + '%');
 								if (typeof v !== 'undefined') {
-									// set editor config directly for change scale
-									iEditor._graphics.cssMaxWidth = mw;
-									iEditor._graphics.cssMaxHeight = mh;
-									// change scale
-									c.css(css).next().css(css);
-									c.parents('.tui-image-editor-canvas-container,tui-image-editor-canvas').css(css);
-									c.closest('.tui-image-editor').css({
-										width: mw,
-										height: mh
-									});
+									var c = $(canvas),
+										w = parseInt(c.attr('width')),
+										h = parseInt(c.attr('height')),
+										a = w / h,
+										mw, mh;
+									if (v === 0) {
+										mw = w;
+										mh = h;
+									} else {
+										mw = parseInt(c.css('max-width')) + Number(v);
+										mh = mw / a;
+										if (mw > w && mh > h) {
+											mw = w;
+											mh = h;
+										}
+									}
+									per.text(Math.round(mw / w * 100) + '%');
+									iEditor.resizeCanvasDimension({width: mw, height: mh});
 									// continually change more
 									if (zoomMore) {
 										setTimeout(function() {
@@ -416,6 +453,7 @@
 							per = $('<button/>').css('width', '4em').text('%').attr('title', '100%').data('val', 0),
 							quty, qutyTm, zoomTm, zoomMore;
 
+						tmpContainer.remove();
 						$base.removeData('url').data('mime', self.file.mime);
 						// jpeg quality controls
 						if (self.file.mime === 'image/jpeg') {
@@ -644,7 +682,7 @@
 				name : 'Photopea',
 				iconImg : 'img/editor-icons.png 0 -160',
 				single: true,
-				urlAsContent: true,
+				noContent: true,
 				arrayBufferContent: true,
 				openMaximized: true,
 				canMakeEmpty: true,
@@ -676,15 +714,8 @@
 						}),
 					editor = this.editor,
 					confObj = editor.confObj,
-					spnr = $('<div/>')
-						.css({
-							position: 'absolute',
-							top: '50%',
-							textAlign: 'center',
-							width: '100%',
-							fontSize: '16pt'
-						})
-						.html(fm.i18n('nowLoading') + '<span class="elfinder-spinner"/>')
+					spnr = $('<div class="elfinder-edit-spinner elfinder-edit-photopea"/>')
+						.html('<span class="elfinder-spinner-text">' + fm.i18n('nowLoading') + '</span><span class="elfinder-spinner"/>')
 						.appendTo(ifm.parent()),
 					getType = function(mime) {
 						var ext = getExtention(mime, fm),
@@ -707,7 +738,7 @@
 						return ext;
 					},
 					mime = file.mime,
-					liveMsg, type;
+					liveMsg, type, quty;
 				
 				if (!confObj.mimesFlip) {
 					confObj.mimesFlip = fm.arrayFlip(confObj.mimes, true);
@@ -773,7 +804,7 @@
 						};
 
 						this.getContent = function() {
-							var type;
+							var type, q;
 							if (phase > 1) {
 								dfdGet && dfdGet.state() === 'pending' && dfdGet.reject();
 								dfdGet = null;
@@ -787,6 +818,9 @@
 								if (ifm.data('mime')) {
 									mime = ifm.data('mime');
 									type = getType(mime);
+								}
+								if (q = ifm.data('quality')) {
+									type += ':' + (q / 100);
 								}
 								wnd.postMessage('app.activeDocument.saveToOE("' + type + '")', orig);
 								return dfdGet;
@@ -811,6 +845,25 @@
 					err && fm.error(err);
 					editor.initFail = true;
 				});
+
+				// jpeg quality controls
+				if (file.mime === 'image/jpeg' || file.mime === 'image/webp') {
+					ifm.data('quality', fm.storage('jpgQuality') || fm.option('jpgQuality'));
+					quty = $('<input type="number" class="ui-corner-all elfinder-resize-quality elfinder-tabstop"/>')
+						.attr('min', '1')
+						.attr('max', '100')
+						.attr('title', '1 - 100')
+						.on('change', function() {
+							var q = quty.val();
+							ifm.data('quality', q);
+						})
+						.val(ifm.data('quality'));
+					$('<div class="ui-dialog-buttonset elfinder-edit-extras elfinder-edit-extras-quality"/>')
+						.append(
+							$('<span>').html(fm.i18n('quality') + ' : '), quty, $('<span/>')
+						)
+						.prependTo(ifm.parent().next());
+				}
 			},
 			load : function(base) {
 				var dfd = $.Deferred(),
@@ -848,6 +901,204 @@
 			close : function(base, liveMsg) {
 				$(base).attr('src', '');
 				liveMsg && $(window).off('message.' + this.fm.namespace, liveMsg.receive);
+			}
+		},
+		{
+			// Pixo is cross-platform image editor
+			info : {
+				id : 'pixo',
+				name : 'Pixo Editor',
+				iconImg : 'img/editor-icons.png 0 -208',
+				dataScheme: true,
+				schemeContent: true,
+				single: true,
+				canMakeEmpty: false,
+				integrate: {
+					title: 'Pixo Editor',
+					link: 'https://pixoeditor.com/privacy-policy/'
+				}
+			},
+			// MIME types to accept
+			mimes : ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/x-ms-bmp'],
+			// HTML of this editor
+			html : '<div class="elfinder-edit-imageeditor"><img/></div>',
+			// called on initialization of elFinder cmd edit (this: this editor's config object)
+			setup : function(opts, fm) {
+				if (fm.UA.ltIE8 || !opts.extraOptions || !opts.extraOptions.pixo || !opts.extraOptions.pixo.apikey) {
+					this.disabled = true;
+				} else {
+					this.editorOpts = opts.extraOptions.pixo;
+				}
+			},
+			// Initialization of editing node (this: this editors HTML node)
+			init : function(id, file, content, fm) {
+				initImgTag.call(this, id, file, content, fm);
+			},
+			// Get data uri scheme (this: this editors HTML node)
+			getContent : function() {
+				return $(this).children('img:first').attr('src');
+			},
+			// Launch Pixo editor when dialog open
+			load : function(base) {
+				var self = this,
+					fm = this.fm,
+					$base = $(base),
+					node = $base.children('img:first'),
+					dialog = $base.closest('.ui-dialog'),
+					elfNode = fm.getUI(),
+					dfrd = $.Deferred(),
+					container = $('#elfinder-pixo-container'),
+					init = function(onload) {
+						var opts;
+							
+						if (!container.length) {
+							container = $('<div id="elfinder-pixo-container" class="ui-front"/>').css({
+								position: 'fixed',
+								top: 0,
+								right: 0,
+								width: '100%',
+								height: $(window).height(),
+								overflow: 'hidden'
+							}).hide().appendTo(elfNode.hasClass('elfinder-fullscreen')? elfNode : 'body');
+							// bind switch fullscreen event
+							elfNode.on('resize.'+fm.namespace, function(e, data) {
+								e.preventDefault();
+								e.stopPropagation();
+								data && data.fullscreen && container.appendTo(data.fullscreen === 'on'? elfNode : 'body');
+							});
+							fm.bind('destroy', function() {
+								editor && editor.cancelEditing();
+								container.remove();
+							});
+						} else {
+							// always moves to last
+							container.appendTo(container.parent());
+						}
+						node.on('click', launch);
+						// Constructor options
+						opts = Object.assign({
+							type: 'child',
+							parent: container.get(0),
+							onSave: function(arg) {
+								// Check current file.hash, all callbacks are called on multiple instances
+								var mime = arg.toBlob().type,
+									ext = getExtention(mime, fm),
+									draw = function(url) {
+										node.one('load error', function() {
+												node.data('loading') && node.data('loading')(true);
+											})
+											.attr('crossorigin', 'anonymous')
+											.attr('src', url);
+									},
+									url = arg.toDataURL();
+								node.data('loading')();
+								delete base._canvas;
+								if (node.data('ext') !== ext) {
+									changeImageType(url, self.file.mime).done(function(res, cv) {
+										if (cv) {
+											base._canvas = canvas = cv;
+											quty.trigger('change');
+											qBase && qBase.show();
+										}
+										draw(res);
+									}).fail(function() {
+										dialog.trigger('changeType', {
+											extention: ext,
+											mime : mime
+										});
+										draw(url);
+									});
+								} else {
+									draw(url);
+								}
+							},
+							onClose: function() {
+								dialog.removeClass(fm.res('class', 'preventback'));
+								fm.toggleMaximize(container, false);
+								container.hide();
+								fm.toFront(dialog);
+							}
+						}, self.confObj.editorOpts);
+						// trigger event 'editEditorPrepare'
+						self.trigger('Prepare', {
+							node: base,
+							editorObj: Pixo,
+							instance: void(0),
+							opts: opts
+						});
+						// make editor instance
+						editor = new Pixo.Bridge(opts);
+						dfrd.resolve(editor);
+						$base.on('saveAsFail', launch);
+						if (onload) {
+							onload();
+						}
+					},
+					launch = function() {
+						dialog.addClass(fm.res('class', 'preventback'));
+						fm.toggleMaximize(container, true);
+						fm.toFront(container);
+						container.show().data('curhash', self.file.hash);
+						editor.edit(node.get(0));
+						node.data('loading')(true);
+					},
+					qBase, quty, qutyTm, canvas, editor;
+
+				node.data('loading')();
+
+				// jpeg quality controls
+				if (self.file.mime === 'image/jpeg') {
+					quty = $('<input type="number" class="ui-corner-all elfinder-resize-quality elfinder-tabstop"/>')
+						.attr('min', '1')
+						.attr('max', '100')
+						.attr('title', '1 - 100')
+						.on('change', function() {
+							var q = quty.val();
+							qutyTm && cancelAnimationFrame(qutyTm);
+							qutyTm = requestAnimationFrame(function() {
+								if (canvas) {
+									canvas.toBlob(function(blob) {
+										blob && quty.next('span').text(' (' + fm.formatSize(blob.size) + ')');
+									}, 'image/jpeg', Math.max(Math.min(q, 100), 1) / 100);
+								}
+							});
+						})
+						.val(fm.storage('jpgQuality') || fm.option('jpgQuality'));
+					qBase = $('<div class="ui-dialog-buttonset elfinder-edit-extras elfinder-edit-extras-quality"/>')
+						.hide()
+						.append(
+							$('<span>').html(fm.i18n('quality') + ' : '), quty, $('<span/>')
+						)
+						.prependTo($base.parent().next());
+					$base.data('quty', quty);
+				}
+
+				// load script then init
+				if (typeof Pixo === 'undefined') {
+					fm.loadScript(['https://pixoeditor.com:8443/editor/scripts/bridge.m.js'], function() {
+						init(launch);
+					}, {loadType: 'tag'});
+				} else {
+					init();
+					launch();
+				}
+				return dfrd;
+			},
+			// Convert content url to data uri scheme to save content
+			save : function(base) {
+				var self = this,
+					$base = $(base),
+					node = $base.children('img:first'),
+					q;
+				if (base._canvas) {
+					q = $base.data('quty')? Math.max(Math.min($base.data('quty').val(), 100), 1) / 100 : void(0);
+					node.attr('src', base._canvas.toDataURL(self.file.mime, q));
+				} else if (node.attr('src').substr(0, 5) !== 'data:') {
+					node.attr('src', imgBase64(node, this.file.mime));
+				}
+			},
+			close : function(base, editor) {
+				editor && editor.destroy();
 			}
 		},
 		{
@@ -1703,7 +1954,8 @@
 											reject(fm.i18n(data.error? data.error : 'errUpload'));
 										}
 									})
-									.fail(function(error) {
+									.fail(function(err) {
+										var error = fm.parseError(err);
 										reject(fm.i18n(error? (error === 'userabort'? 'errAbort' : error) : 'errUploadNoFiles'));
 									})
 									.progress(function(data) {
@@ -1806,7 +2058,7 @@
 						// fit height function
 						textarea._setHeight = function(height) {
 							var base = $(this).parent(),
-								h	= height || base.height(),
+								h	= height || base.innerHeight(),
 								ctrH = 0,
 								areaH;
 							base.find('.mce-container-body:first').children('.mce-top-part,.mce-statusbar').each(function() {
@@ -1976,15 +2228,9 @@
 			init : function(id, file, dum, fm) {
 				var ta = this,
 					ifm = $(this).hide(),
-					spnr = $('<div/>')
-						.css({
-							position: 'absolute',
-							top: '50%',
-							textAlign: 'center',
-							width: '100%',
-							fontSize: '16pt'
-						})
-						.html(fm.i18n('nowLoading') + '<span class="elfinder-spinner"/>')
+					uiToast = fm.getUI('toast'),
+					spnr = $('<div class="elfinder-edit-spinner elfinder-edit-zohoeditor"/>')
+						.html('<span class="elfinder-spinner-text">' + fm.i18n('nowLoading') + '</span><span class="elfinder-spinner"/>')
 						.appendTo(ifm.parent()),
 					cdata = function() {
 						var data = '';
@@ -2001,7 +2247,7 @@
 						method: 'init',
 						'args[target]': file.hash,
 						'args[lang]' : fm.lang,
-						'args[cdata]' : cdata
+						'args[cdata]' : cdata()
 					},
 					preventDefault : true
 				}).done(function(data) {
@@ -2021,6 +2267,20 @@
 						});
 
 						ifm.attr('src', data.zohourl).show().css(opts.css);
+						if (data.warning) {
+							uiToast.appendTo(ta.closest('.ui-dialog'));
+							fm.toast({
+								msg: fm.i18n(data.warning),
+								mode: 'warning',
+								timeOut: 0,
+								onHidden: function() {
+									uiToast.children().length === 1 && uiToast.appendTo(fm.getUI());
+								},
+								button: {
+									text: 'btnYes'
+								}
+							});
+						}
 					} else {
 						data.error && fm.error(data.error);
 						ta.elfinderdialog('destroy');
@@ -2154,7 +2414,6 @@
 						Hash: 'txt'
 					},
 					link : '<div class="elfinder-edit-onlineconvert-link"><a href="https://www.online-convert.com" target="_blank"><span class="elfinder-button-icon"></span>ONLINE-CONVERT.COM</a></div>',
-					toastWidth : 280,
 					useTabs : ($.fn.tabs && !fm.UA.iOS)? true : false // Can't work on iOS, I don't know why.
 				}, mOpts);
 			},
@@ -2382,27 +2641,18 @@
 							(set.showLink? $(set.link) : null)
 						)
 						.appendTo(ifm.parent().css({overflow: 'auto'})),
-					spnr = $('<div class="elfinder-edit-spiner elfinder-edit-online-convert"/>')
+					spnr = $('<div class="elfinder-edit-spinner elfinder-edit-onlineconvert"/>')
 						.hide()
-						.css({
-							position: 'absolute',
-							top: '50%',
-							textAlign: 'center',
-							width: '100%',
-							fontSize: '16pt'
-						})
-						.html('<span class="elfinder-edit-loadingmsg">' + fm.i18n('nowLoading') + '</span><span class="elfinder-spinner"/>')
+						.html('<span class="elfinder-spinner-text">' + fm.i18n('nowLoading') + '</span><span class="elfinder-spinner"/>')
 						.appendTo(ifm.parent()),
 					_url = null,
 					url = function() {
+						var onetime;
 						if (_url) {
 							return $.Deferred().resolve(_url);
 						} else {
 							spnr.show();
-							return fm.url(file.hash, {
-								async: true,
-								temporary: true
-							}).done(function(url) {
+							return fm.forExternalUrl(file.hash).done(function(url) {
 								_url = url;
 							}).fail(function(error) {
 								error && fm.error(error);
@@ -2451,7 +2701,7 @@
 								fm.error(err.length? err : status.info);
 								select.fadeIn();
 							} else if (status.code === 'completed') {
-								upload(res.output);
+								upload(res);
 							} else {
 								setStatus(status);
 								setTimeout(function() {
@@ -2465,7 +2715,6 @@
 									msg: fm.i18n(res.message),
 									mode: 'error',
 									timeOut: 5000,
-									width: set.toastWidth,
 									onHidden: function() {
 										uiToast.children().length === 1 && uiToast.appendTo(fm.getUI());
 									}
@@ -2475,7 +2724,6 @@
 								msg: fm.i18n('editorConvNoApi'),
 								mode: 'warning',
 								timeOut: 3000,
-								width: set.toastWidth,
 								onHidden: function() {
 									uiToast.children().length === 1 && uiToast.appendTo(fm.getUI());
 									open(cat, con);
@@ -2484,7 +2732,7 @@
 						}
 					},
 					setStatus = function(status) {
-						spnr.show().children('.elfinder-edit-loadingmsg').text(status.info);
+						spnr.show().children('.elfinder-spinner-text').text(status.info);
 					},
 					polling = function(jobid) {
 						fm.request({
@@ -2502,8 +2750,10 @@
 							ta.elfinderdialog('destroy');
 						});
 					},
-					upload = function(output) {
-						var url = '';
+					upload = function(res) {
+						var output = res.output,
+							id = res.id,
+							url = '';
 						spnr.hide();
 						if (output && output.length) {
 							ta.elfinderdialog('destroy');
@@ -2515,7 +2765,10 @@
 							fm.upload({
 								target: file.phash,
 								files: [url],
-								type: 'text'
+								type: 'text',
+								extraData: {
+									contentSaveId: 'OnlineConvert-' + res.id
+								}
 							});
 						}
 					},
@@ -2556,8 +2809,7 @@
 										fm.toast({
 											msg: fm.i18n('editorConvNeedUpload'),
 											mode: 'info',
-											timeOut: 10000,
-											width: set.toastWidth,
+											timeOut: 15000,
 											onHidden: function() {
 												uiToast.children().length === 1 && uiToast.appendTo(fm.getUI());
 											},
